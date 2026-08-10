@@ -1,0 +1,17 @@
+{{- if .Values.postgresql.enabled }}
+# ОТДЕЛЬНЫЙ сервис ПОД БАЗУ, для ее доступности внутри кубера
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.svc.db_service.name}}
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: ClusterIP
+  selector:
+    #project: {{ .Release.Name }}-db # то же что указано для подов в деплойменте базы, не забывать проверять опечатки КЛЮЧ и ЗНАЧЕНИЕ должны совпадать
+    {{- include "next_chart.selectorLabels" (dict "Release" .Release "component" "db") | nindent 4 }}
+  ports:
+    {{- toYaml .Values.svc.db_service.portsAndProtocol | nindent 5 }}
+
+{{- end }}

@@ -1,0 +1,115 @@
+# values.yaml
+# блок с переменными для postgress деплоймент
+postgresql:
+  enabled: false
+  image:
+    repository: registry.gitlab.com/dustlex/super_test
+    tag: postgress16_v1
+  replicas: 1
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "2Gi"
+      cpu: "2000m"
+
+# блок с переменными для postgress-bitnami чарта
+postgresqlbitnami:
+  
+  enabled: true
+  auth:
+   #username: postgres # в нормальном случае было бы так, т.к. bitnami не берет имя юзер и БД из секрета
+   #database: postgres
+    existingSecret: db-secret-cred # указываю свой секрет, чтоб сам чарт свой не создавал
+    secretKeys: # придется назначить что чарту из секрета каким значением считать
+      adminPasswordKey: POSTGRES_PASSWORD # т.к. в секрете и так все перекостылено, теперь костыль тут
+      userPasswordKey: DB_PASSWORD 
+      replicationPasswordKey: DB_PASSWORD
+  
+  primary:
+    extraEnvVars: # фактически костыль, чтобы имя пользователя и БД тоже бралось из секрета
+      - name: POSTGRES_USER
+        valueFrom:
+          secretKeyRef:
+            name: db-secret-cred
+            key: DB_USER
+      - name: POSTGRES_DATABASE
+        valueFrom:
+          secretKeyRef:
+            name: db-secret-cred
+            key: DB_NAME 
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "2Gi"
+        cpu: "2000m"
+    persistence:
+      enabled: true
+      storageClass: fast.ru-3b # или что актуально по документации или через kubectl get storageclass
+      size: 1Gi   # одного гига тут с головой
+
+# блок с инфой для хранилищь
+volumes:
+  pvcname: db-pvc
+  persist:
+    storageClass: fast.ru-3b # или что актуально по документации или через kubectl get storageclass
+    size: 1Gi
+
+#блок с переменными для сервисов
+svc:
+ 
+  db_service:
+    name: db-service
+    portsAndProtocol:
+    - port: 5432 # ответ другим подам
+      targetPort: 5432 # слушаем в контейнере
+      protocol: TCP
+  
+  app_service:
+    name: single-depl1-service
+    portsAndProtocol:
+    - port: 80 # будет отвечать по нему ingress и другим подам
+      targetPort: 5000
+      protocol: TCP
+
+# блок с переменными для деплоймента с приложением
+app:
+  image:
+    repository: registry.gitlab.com/dustlex/super_test
+    tag: app_final_v1
+  replicas: 3
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+
+# Блок для HorizontalPodAutoscaler
+hpa_app:
+  enabled: true
+  minRep: 2
+  maxRep: 6
+
+
+# Блок переменных для Ingress-nginx
+ingress:
+  host: fucking-slave.ru
+  tls:
+    enabled: true # чтобы можно было отключать для теста
+    secretName: slave-tls-secret
+    issuerName: letsencrypt-prod
+    email: test@fucking-slave.ru
+
+# имена секретов
+secrets:
+  registrySecret: gitlab-registry-secret # имя секрета с доступами к китлаб хранилищу имейджей
+  dbSecret: db-secret-cred # имя секрета с доступами БД
+
+# для мониторинга
+monitoring:
+  enabled: false

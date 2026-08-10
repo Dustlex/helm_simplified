@@ -1,0 +1,28 @@
+#CERT-MANAGER привет
+#
+# ТУТ оберну в IF вообще весь манифест, чтобы он не колупал LE issuer в холостую
+#
+
+{{- if .Values.ingress.tls.enabled }}
+
+apiVersion: cert-manager.io/v1 # понадобится для LE
+kind: Issuer
+metadata:
+  name: {{ .Values.ingress.tls.issuerName }} # будем указывать в ingress
+  namespace: {{ .Release.Namespace }}
+spec:
+  acme:
+    # буду юзать стандартный Let's Encrypt
+    server: https://acme-v02.api.letsencrypt.org/directory
+    # почта для уведомлений от Let's Encrypt , хз, пусть будет для порядка
+    email: {{ .Values.ingress.tls.email }} # есть только тут, но закину в переменную т.к. мб придется поменять когда-нибудь
+    privateKeySecretRef:
+      name: le-account-key # секрет куда кладется ключ для авторизации аккаунта в LE системе, хардкод, т.к. он есть только тут, и нужды в смене нет
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+
+{{- end }}
+
+# //////////

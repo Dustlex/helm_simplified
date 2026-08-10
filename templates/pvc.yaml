@@ -1,0 +1,17 @@
+{{- if .Values.postgresql.enabled }}
+# постоянное хранилище для базы, чтоб все не хранилось только внутри контейнера, хотя учитывая что для прода все равно идет bitnami с своим pvc... , кароч это рудимент
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.volumes.pvcname}} # его указываем при обьявлении volumes для подов/деплойментов
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce # т.к. оно для теста, разрешаю монтировать толкьо на ОДИН под
+  resources:
+    requests:
+      storage: {{ .Values.volumes.persist.size}} # Размер
+  storageClassName: {{ .Values.volumes.persist.storageClass}} # явно указываю класс, т.к. иначе пытыется лезть default что часто в облаках нельзя, смотреть какое имя доступно именно у этого облачного провайдера можно через kubectl get storageclass но лучше через документацию, т.к. у них иногда выхлоп storageclass не соответствует реальности, привет selectel
+
+{{- end }}

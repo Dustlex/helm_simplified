@@ -1,0 +1,56 @@
+# ОТДЕЛЬНЫЙ деплоймент для ПРИЛОЖЕНИЯ
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-app
+  labels:
+    app: {{ .Release.Name }}-app
+  namespace: {{ .Release.Namespace }}
+
+spec:
+{{- if not .Values.hpa_app.enabled }} # чтоб не конфликтовало с hpa сделаю так, но лучше потом уберу, если не забуду
+  replicas: {{ .Values.app.replicas }}
+{{- end }}
+  selector:
+    matchLabels:
+      project: {{ .Release.Name }}-app # лейбл подов за которым следит деплой, не ошибиться в названии 
+  template:
+    metadata:
+      labels:
+        project: {{ .Release.Name }}-app # лейбл самих подов
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5000"
+        prometheus.io/path: "/metrics"
+    
+    spec:
+
+      imagePullSecrets: # люблю эту фишку, если в секрете есть доступы, он сам авторизуется в харнилище имейджей
+      - name: {{ .Values.secrets.registrySecret}}
+      
+      containers:
+      - name: app
+
+        resources: # описание в аналогичном блоке для базы
+          {{- toYaml .Values.app.resources | nindent 10}}
+
+        image: {{ .Values.app.image.repository }}:{{ .Values.app.image.tag}} # контейнер в хранилище гитлаба
+        ports: 
+        - containerPort: 5000 # пусть будет для документации
+          #hostPort: 5000 # Прокинет порт на ноде ГДЕ запустится под, мешает автоскалированию
+        env: # тут вкорячу IF-ELSE т.к. есть обычная база для тестов, и чарт bitnami для прода
+        {{- if .Values.postgresqlbitnami.enabled }}
+        - name: DB_HOST
+          value: {{ .Release.Name }}-postgresqlbitnami
+        {{- else }}
+        - name: DB_HOST
+          value: {{ .Values.svc.db_service.name}} 
+        {{- end }}
+        - name: DB_PORT
+          value: "5432"
+        
+        envFrom:
+        - secretRef:
+            name: {{ .Values.secrets.dbSecret }} # из костыльного секрета тяну имя базы, юзера и пароль

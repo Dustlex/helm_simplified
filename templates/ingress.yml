@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-nextjs-ingress
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    cert-manager.io/issuer: {{ .Values.ingress.tls.issuerName }} # обязательно для работы cert-manager, letsencrypt-prod указан в имени
+    #nginx.ingress.kubernetes.io/ssl-redirect: "true"  # принудительный редирект на https , может сломать выдачу LE серта если его еще нет т.к. le лезет изначально по http для проверки домена, но стоит перепроверить
+    # Поддержка WebSocket если я вообще стал это настраивать
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  ingressClassName: nginx # Указание что это для Nginx Ingress Controller
+
+{{- if .Values.ingress.tls.enabled }} # если значение false, убираем https
+  tls: # Настройка HTTPS
+  - hosts:
+    - {{ .Values.ingress.host }} # указываем домен
+    secretName: {{ .Values.ingress.tls.secretName }} # имя секрета куда cert-manager закинет готовый сертификат
+{{- end }}
+
+  rules:
+  - host: {{ .Values.ingress.host }}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ .Values.svc.app_service.name }} # Имя нашего Service что выше
+            port:
+              number: 80 # Порт, на котором отвечает сервис чтоб его слушать, на внешний IP не влияет

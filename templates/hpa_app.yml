@@ -1,0 +1,30 @@
+{{- if .Values.hpa_app.enabled }}
+# запускаем автоскейлер ТОЛЬКО если он включен в values файле
+# ОТДЕЛЬНЫЙ HORIZONTAL POD AUTOSCALER для деплоймента приложения
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: 
+  name: {{ .Release.Name }}-hpa
+  namespace: {{ .Release.Namespace }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ .Release.Name }}-app
+  minReplicas: {{ .Values.hpa_app.minRep }} # перезапишет значение реплик в деплойменте если в нем это указано
+  maxReplicas: {{ .Values.hpa_app.maxRep }}
+  metrics:
+    - type: Resource
+      resource:
+       name: cpu
+       target:
+         type: Utilization
+         averageUtilization: 75 # относительно requests раздела в деплойменте
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80  # относительно requests раздела в деплойменте
+{{- end }}

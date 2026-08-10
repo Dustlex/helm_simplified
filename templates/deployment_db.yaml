@@ -1,0 +1,55 @@
+{{- if .Values.postgresql.enabled }}
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "next_chart.fullname" (dict "Release" .Release "component" "db") }} #значения заданы тут, но шаблон для их установки беру свой из _helpers.tpl , выхлоп аналогичен name: {{ .Release.Name }}-db 
+  labels:
+    #app: depl-db # оставилю так, чтоб не трогать service_db.yml
+    {{- include "next_chart.labels" (dict "Release" .Release "component" "db" ) | nindent 4 }} # аналогично, выхлоп будет app: .Release.Name-db но из-за шаблона _helpers.tpl
+  namespace: {{ .Release.Namespace }}
+
+spec:
+  strategy: # по умолчанию, deployment обновляется через rolling update, т.е. сначала создается новый под, затем удаляется старый. Но это может вызвать проблему если есть монтирование к постоянному хранилищу которое разрешает монтирование только одного пода одновременно.
+    type: Recreate # потому тут указываю стратегию пересоздания. Будет небольшой даунтайм.
+  replicas: {{ .Values.postgresql.replicas }}
+  selector:
+    matchLabels:
+      {{- include "next_chart.selectorLabels" (dict "Release" .Release "component" "db") | nindent 6 }} # лейбл ПОДов за которыми будет следить деплой, не забывать проверить и ключ и значение. выхлоп будет аналогичен project: {{ .Release.Name }}-db
+  template:
+    metadata:
+      labels:
+      {{- include "next_chart.selectorLabels" (dict "Release" .Release "component" "db") | nindent 8 }}  # лейбл с которыми будут создаваться поды, этот же лейбл будет для сервиса для доступа, т.к. итоговый выхлоп от project: {{ .Release.Name }}-db не поменяется, то в сервисе я лейбл не правлю
+
+    spec:
+
+      imagePullSecrets:
+      - name: {{ .Values.secrets.registrySecret }} 
+
+      containers: # Контейнер с PostgreSQL
+      - name: postgres
+
+        resources: # укажу лимиты, чтобы под не съел всю ноду
+          {{- toYaml .Values.postgresql.resources | nindent 10 }} # ВЕСЬ блок resources из values через toYaml
+
+        image: {{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}
+        ports:
+        - containerPort: 5432 # будет для документации
+        
+        envFrom: # вытащим доступы для базы из секрета
+        - secretRef:
+            name: {{ .Values.secrets.dbSecret }}
+        
+        env:
+        - name: PGDATA
+          value: "/var/lib/postgresql/data/pgdata" # создам поддиру для хранения из-за volume, который создает основную диру не пустой, а с служебной директорией lost+found, что не дает стартануть PG
+        
+        volumeMounts:
+        - name: db-storage
+          mountPath: /var/lib/postgresql/data # где база хранит данные
+
+      volumes:
+       - name: db-storage
+         persistentVolumeClaim:
+           claimName: {{ .Values.volumes.pvcname }} # имя хранилища
+{{- end }} 

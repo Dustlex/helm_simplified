@@ -1,0 +1,14 @@
+#ОТДЕЛЬНЫЙ СЕРВИС ДЛЯ подов ПРИЛОЖЕНИЯ
+
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.svc.app_service.name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: ClusterIP
+  selector:
+    project: {{ .Release.Name }}-app # сервис для подов приложухи
+  ports:
+    {{- toYaml .Values.svc.app_service.portsAndProtocol | nindent 5 }}
